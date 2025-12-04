@@ -9,7 +9,7 @@ class AudioSettings:
     sample_rate: int = 16000
     channels: int = 1
     dtype: str = 'float32'
-    whisper_model: str = 'tiny'
+    whisper_model: str = 'small'
     compute_type: str = 'int8'
     models_directory: str = None
 
@@ -40,7 +40,7 @@ class UISettings:
     """User interface configuration."""
     window_width: int = 500
     window_height: int = 570
-    window_title: str = "Minecraft-STT"
+    window_title: str = "mc-vc"
     theme: str = "dark"
     color_theme: str = "green"
     icon_path: str = "icons/titlebar-icon.ico"
