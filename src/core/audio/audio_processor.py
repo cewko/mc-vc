@@ -13,19 +13,26 @@ class AudioProcessor:
     def __init__(
         self, 
         transcription_callback: Callable[[str], None],
-        model_ready_callback: Optional[Callable[[bool], None]] = None
+        model_ready_callback: Optional[Callable[[bool], None]] = None,
+        status_callback: Optional[Callable[[str], None]] = None
     ):
         self._logger = logging.getLogger(__name__)
         self._transcription_callback = transcription_callback
         self._model_ready_callback = model_ready_callback
+        self._status_callback = status_callback
         
-        self._voice_recorder = VoiceRecorder()
+        self._voice_recorder = VoiceRecorder(buffer_full_callback=self._on_buffer_full)
         self._speech_recognizer = SpeechRecognizer(self._on_model_ready)
         
     def initialize_model(self) -> None:
         """Initialize the speech recognition model asynchronously."""
         self._logger.info("Initializing speech recognition model")
         self._speech_recognizer.initialize_model_async()
+
+    def _on_buffer_full(self, message: str) -> None:
+        self._logger.warning(message)
+        if self._status_callback:
+            self._status_callback(message)
     
     def _on_model_ready(self, is_ready: bool) -> None:
         """Handle model ready callback."""

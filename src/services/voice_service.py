@@ -29,7 +29,8 @@ class VoiceService:
         # Initialize components
         self._audio_processor = AudioProcessor(
             self._on_transcription_complete, 
-            self._on_model_ready
+            self._on_model_ready,
+            status_callback
         )
         self._hotkey_manager = HotkeyManager(
             hotkey_mappings,
