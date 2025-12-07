@@ -1,5 +1,6 @@
 import logging
 import time
+import pyperclip
 from pynput.keyboard import Key, Controller
 
 from config.constants import MINECRAFT_CHAT_KEY, ENTER_KEY_DELAY
@@ -14,22 +15,40 @@ class KeyboardController:
         self._controller = Controller()
     
     def send_message_to_minecraft(self, message: str, auto_send: bool = True) -> None:
-        """Send a message to Minecraft chat."""
+        """Send a message to Minecraft chat using clipboard paste."""
         try:
-            # Open chat
-            self.simulate_key_press(MINECRAFT_CHAT_KEY)
-            time.sleep(ENTER_KEY_DELAY)
+            original_clipboard = None
+            try:
+                original_clipboard = pyperclip.paste()
+            except:
+                # ignore if clipboard is empty or inaccesible
+                pass
             
-            # Type the message
-            self._controller.type(message)
+            pyperclip.copy(message)
+            
+            self.simulate_key_press(MINECRAFT_CHAT_KEY)
+            
+            self._controller.press(Key.ctrl)
+            time.sleep(0.05)
+            self._controller.press('v')
+            time.sleep(0.05)
+            self._controller.release('v')
+            time.sleep(0.05)
+            self._controller.release(Key.ctrl)
             
             if auto_send:
-                # Send the message
                 self.simulate_key_press(Key.enter)
                 self._logger.info(f"Sent to Minecraft chat: '{message}'")
             else:
-                # Leave message in chat for manual editing/sending
                 self._logger.info(f"Typed in Minecraft chat: '{message}' (manual send)")
+            
+            # restore clipboard to prev state after everything is done
+            if original_clipboard is not None:
+                time.sleep(0.15)
+                try:
+                    pyperclip.copy(original_clipboard)
+                except:
+                    pass
                 
         except Exception as error:
             raise MessageSendError(f"Failed to send message to Minecraft: {error}")
