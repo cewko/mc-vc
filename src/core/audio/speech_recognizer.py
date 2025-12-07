@@ -100,19 +100,19 @@ class SpeechRecognizer:
                 raise AudioProcessingError("Model not initialized. Call initialize_model_async() first.")
             
         try:
-            with self._model_load_lock:
-                if self._model is None:
-                    raise AudioProcessingError("Model is None despite being marked as ready")
-                    
-                segments, _ = self._model.transcribe(
-                    audio_data, 
-                    language='en',
-                    vad_filter=True, 
-                    vad_parameters=dict(min_silence_duration_ms=500),
-                    beam_size=self._audio_settings.beam_size,
-                    best_of=1,
-                    temperature=0.0
-                )
+            if self._model is None:
+                raise AudioProcessingError("Model is None despite being marked as ready")
+            
+            segments, _ = self._model.transcribe(
+                audio_data, 
+                language='en',
+                vad_filter=True, 
+                vad_parameters=dict(min_silence_duration_ms=500),
+                beam_size=self._audio_settings.beam_size,
+                best_of=1,
+                temperature=0.0,
+                condition_on_previous_text=False
+            )
                 
             text = ''.join([segment.text for segment in segments]).strip()
             
@@ -121,6 +121,7 @@ class SpeechRecognizer:
                 
             formatted_text = self._format_text(text)
             self._logger.info(f"Transcribed text: '{formatted_text}'")
+            
             return formatted_text
             
         except Exception as e:
