@@ -26,6 +26,7 @@ class HotkeyManager:
         self._pressed_keys: Set[str] = set()
         self._is_running = False
         self._key_lock = Lock()
+        self._hooks = []
         
     def _validate_hotkey_mappings(self, mappings: Dict[str, str]) -> None:
         """Validate hotkey mappings."""
@@ -44,44 +45,57 @@ class HotkeyManager:
         
     def start_monitoring(self) -> None:
         """Start monitoring hotkeys."""
-        try:
-            self._is_running = True
-            self._logger.info(f"Started hotkey monitoring for keys: {list(self._hotkey_mappings.keys())}")
-        except Exception as error:
-            self._is_running = False
-            raise HotkeyError(f"Failed to start hotkey monitoring: {error}")
-        
-    def stop_monitoring(self) -> None:
-        """Stop monitoring hotkeys."""
-        self._is_running = False
-        with self._key_lock:
-            self._pressed_keys.clear()
-        self._logger.info("Stopped hotkey monitoring")
+        self._is_running = True
+
+        for hotkey, prefix in self._hotkey_mappings.items():
+            press_hook = keyboard.on_press_key(
+                hotkey.lower(),
+                lambda e, p=prefix: self._on_key_down(p),
+                suppress=False
+            )
+            release_hook = keyboard.on_release_key(
+                hotkey.lower(),
+                lambda e, p=prefix: self._on_key_up(p),
+                suppress=False
+            )
+            self._hooks.extend([press_hook, release_hook])
+
+        self._logger.info(f"Started keyboard monitoring for: {list(self._hotkey_mappings.keys())}")
     
-    def check_hotkeys(self) -> None:
-        """Check hotkey states and trigger callbacks."""
+    def stop_monitoring(self) -> None:
+        """Stop monitoring hotkeys and cleanup"""
         if not self._is_running:
             return
-            
-        try:
-            with self._key_lock:
-                for hotkey, prefix in self._hotkey_mappings.items():
-                    try:
-                        if keyboard.is_pressed(hotkey):
-                            if hotkey not in self._pressed_keys:
-                                self._pressed_keys.add(hotkey)
-                                self._start_callback(prefix)
-                        else:
-                            if hotkey in self._pressed_keys:
-                                self._pressed_keys.remove(hotkey)
-                                self._stop_callback(prefix)
-                    except Exception as error:
-                        self._logger.warning(f"Error checking hotkey '{hotkey}': {error}")
-                        self._pressed_keys.discard(hotkey)
-                        
-        except Exception as error:
-            self._logger.error(f"Critical hotkey monitoring error: {error}")
-            raise HotkeyError(f"Hotkey monitoring failed: {error}")
+        
+        self._is_running = False
+
+        for hook in self._hooks:
+            keyboard.unhook(hook)
+
+        self._hooks.clear()
+
+        with self._key_lock:
+            self._pressed_keys.clear()
+
+        self._logger.info("Stopped hotkey monitoring")
+
+    def _on_key_down(self, prefix: str) -> None:
+        if not self._is_running:
+            return
+        
+        with self._key_lock:
+            if prefix not in self._pressed_keys:
+                self._pressed_keys.add(prefix)
+                self._start_callback(prefix)
+
+    def _on_key_up(self, prefix: str) -> None:
+        if not self._is_running:
+            return
+        
+        with self._key_lock:
+            if prefix in self._pressed_keys:
+                self._pressed_keys.remove(prefix)
+                self._stop_callback(prefix)
     
     def update_hotkey_mappings(self, new_mappings: Dict[str, str]) -> None:
         """Update hotkey mappings."""

@@ -7,7 +7,7 @@ from core.audio.audio_processor import AudioProcessor
 from core.input.hotkey_manager import HotkeyManager
 from core.system.minecraft_detector import MinecraftDetector
 from services.message_sender import MessageSender
-from config.constants import MINECRAFT_PROCESS_CHECK_INTERVAL, STATUS_UPDATE_DELAY
+from config.constants import STATUS_UPDATE_DELAY
 
 
 class VoiceService:
@@ -43,7 +43,6 @@ class VoiceService:
         # State management
         self._is_running = False
         self._current_prefix = ""
-        self._monitoring_thread: Optional[threading.Thread] = None
         
         self._update_status(f"Voice service initialized ({'auto-send' if auto_send else 'manual-send'})")
     
@@ -77,14 +76,6 @@ class VoiceService:
         self._is_running = True
         self._hotkey_manager.start_monitoring()
         
-        # Start monitoring thread
-        self._monitoring_thread = threading.Thread(
-            target=self._monitoring_loop,
-            daemon=True,
-            name="VoiceServiceMonitor"
-        )
-        self._monitoring_thread.start()
-        
         send_mode = "auto-send" if self._auto_send else "manual-send"
         self._update_status(f"Started ({send_mode}). Use configured hotkeys to record")
         self._logger.info(f"VC service started with hotkeys: {self._hotkey_mappings}")
@@ -97,9 +88,6 @@ class VoiceService:
         self._is_running = False
         self._hotkey_manager.stop_monitoring()
         self._audio_processor.cleanup()
-        
-        if self._monitoring_thread and self._monitoring_thread.is_alive():
-            self._monitoring_thread.join(timeout=1.0)
         
         self._update_status("Stopped")
         self._logger.info("VC service stopped")
@@ -116,18 +104,6 @@ class VoiceService:
         """Update hotkey mappings."""
         self._hotkey_mappings = new_mappings
         self._hotkey_manager.update_hotkey_mappings(new_mappings)
-    
-    def _monitoring_loop(self) -> None:
-        """Main monitoring loop for hotkeys."""
-        try:
-            while self._is_running:
-                self._hotkey_manager.check_hotkeys()
-                time.sleep(MINECRAFT_PROCESS_CHECK_INTERVAL)
-        except Exception as error:
-            self._logger.error(f"Error in monitoring loop: {error}")
-            self._update_status(f"Monitoring error")
-        finally:
-            self._logger.info("Monitoring loop stopped")
     
     def _on_hotkey_pressed(self, prefix: str) -> None:
         """Handle hotkey press event."""
